@@ -1,0 +1,120 @@
+// Prisma schema for Cipher Clash
+// Run: pnpm --filter api db:generate && pnpm --filter api db:migrate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ─────────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id            // Supabase auth user UUID
+  email       String   @unique
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attempts    DailyAttempt[]
+  battlePasses UserBattlePass[]
+}
+
+// ─── Daily Words ────────────────────────────────────────────────────────────
+
+model DailyWord {
+  id        Int      @id @default(autoincrement())
+  date      String   @unique // YYYY-MM-DD
+  word      String
+  length    Int
+
+  attempts  DailyAttempt[]
+
+  @@index([date])
+}
+
+// ─── Word Lists (server-side only) ──────────────────────────────────────────
+
+model WordList {
+  id      Int    @id @default(autoincrement())
+  word    String @unique
+  length  Int
+  isAnswer Boolean @default(false) // true = can be an answer; false = valid guess only
+
+  @@index([length, isAnswer])
+}
+
+// ─── Daily Attempts ─────────────────────────────────────────────────────────
+
+model DailyAttempt {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  date        String   // YYYY-MM-DD
+  wordId      Int
+
+  guesses     String[] // ordered list of submitted guesses
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  solveTimeMs Int?
+  score       Int       @default(0)
+  solved      Boolean   @default(false)
+  guessCount  Int       @default(0)
+
+  user        User      @relation(fields: [userId], references: [id])
+  dailyWord   DailyWord @relation(fields: [wordId], references: [id])
+
+  @@unique([userId, date])
+  @@index([date, score, solveTimeMs])
+}
+
+// ─── Battle Pass ─────────────────────────────────────────────────────────────
+
+model BattlePassSeason {
+  id        Int      @id @default(autoincrement())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  maxTiers  Int      @default(15)
+  xpPerTier Int      @default(100)
+  createdAt DateTime @default(now())
+
+  rewards    BattlePassReward[]
+  userPasses UserBattlePass[]
+}
+
+model BattlePassReward {
+  id          Int    @id @default(autoincrement())
+  seasonId    Int
+  tier        Int
+  isPremium   Boolean @default(false) // false = free track; true = paid track only
+  rewardType  String  // badge | theme | title | effect | border | banner | xp_boost
+  rewardKey   String
+  rewardName  String
+  rewardData  Json?
+
+  season      BattlePassSeason @relation(fields: [seasonId], references: [id])
+
+  @@index([seasonId, tier])
+}
+
+model UserBattlePass {
+  id               Int      @id @default(autoincrement())
+  userId           String
+  seasonId         Int
+  isPremium        Boolean  @default(false)
+  currentXp        Int      @default(0)
+  currentTier      Int      @default(0)
+  purchasedAt      DateTime?
+  stripePaymentId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id])
+  season  BattlePassSeason @relation(fields: [seasonId], references: [id])
+
+  @@unique([userId, seasonId])
+}
