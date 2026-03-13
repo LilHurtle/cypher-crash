@@ -6,4 +6,3 @@ dist
 .DS_Store
 *.log
 prisma/migrations/*/migration_lock.toml
-pnpm-lock.yaml

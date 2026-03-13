@@ -12,7 +12,13 @@ import { supabase } from './supabase';
 
 const BASE = '/api';
 
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
 async function getHeaders(): Promise<HeadersInit> {
+  if (DEV_MODE) {
+    // Dev mode: send the well-known dev token — accepted by the API when DEV_MODE=true
+    return { 'Content-Type': 'application/json', Authorization: 'Bearer dev-local-token' };
+  }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return {

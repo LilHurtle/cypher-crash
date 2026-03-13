@@ -1,0 +1,71 @@
+# Cipher Clash — local play-test stack
+#
+# Usage:
+#   docker compose up --build
+#
+# Then open http://localhost:5173 in your browser.
+# No accounts, no API keys, no setup required.
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cypher_crash
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cypher_crash"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── API server ──────────────────────────────────────────────────────────────
+  # Automatically runs: schema push → seed word lists → start Fastify
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cypher_crash
+      # DEV_MODE=true bypasses JWT auth — accepts "Bearer dev-local-token"
+      DEV_MODE: "true"
+      DAILY_SECRET: "dev-only-daily-secret-not-for-production"
+      WEB_URL: "http://localhost:5173"
+      # Stripe / Supabase not needed for play-testing
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Web (Vite dev server) ───────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      # VITE_DEV_MODE=true gives an instant "Dev Player" login — no Google needed
+      VITE_DEV_MODE: "true"
+      # Vite proxy target — points to the api service on the Docker network
+      VITE_API_URL: "http://api:3001"
+      # Supabase not needed in dev mode
+      VITE_SUPABASE_URL: ""
+      VITE_SUPABASE_ANON_KEY: ""
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

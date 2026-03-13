@@ -1,6 +1,93 @@
 # Cipher Clash ⚔️
 
-**Cipher Clash** is a daily competitive Wordle-like web game where players race the clock to guess a hidden word, earn scores, and compete on daily and weekly leaderboards.
+**Cipher Clash** is a daily competitive Wordle-like web game — guess the hidden word, race the clock, and compete on leaderboards.
+
+---
+
+## 🎮 Play Test It Right Now (1 command)
+
+The fastest way to play with **zero account setup** — no Google login, no Supabase, no Stripe required.
+
+### Option A — Docker (easiest, fully automated)
+
+**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+
+```bash
+# 1. Clone the repo (if you haven't already)
+git clone https://github.com/LilHurtle/cypher-crash.git
+cd cypher-crash
+
+# 2. Start everything (database + API + web)
+docker compose up --build
+```
+
+Wait about 60–90 seconds for the first build. When you see:
+
+```
+web | VITE ready in ...ms
+web |   ➜  Local: http://localhost:5173/
+```
+
+Open **http://localhost:5173** in your browser. You're automatically logged in as **Dev Player** — start typing to play!
+
+To stop: `Ctrl+C`, then `docker compose down`.
+
+> Your game progress is saved in a local PostgreSQL volume so it persists between restarts.
+
+---
+
+### Option B — Node + local PostgreSQL
+
+**Requirements:** Node.js ≥ 18, pnpm ≥ 8, PostgreSQL running locally.
+
+```bash
+# 1. Install pnpm if you don't have it
+npm install -g pnpm
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Set up API environment
+cp apps/api/.env.example apps/api/.env
+# Edit apps/api/.env and set:
+#   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/cypher_crash"
+#   DEV_MODE="true"    ← this bypasses Google login
+#   DAILY_SECRET="any-random-string"
+
+# 4. Set up Web environment
+cp apps/web/.env.example apps/web/.env
+# Edit apps/web/.env and set:
+#   VITE_DEV_MODE="true"    ← this auto-logs you in as Dev Player
+
+# 5. Create the database and apply schema
+pnpm --filter api db:push
+
+# 6. Seed word lists + create the first Battle Pass season
+pnpm --filter api seed
+
+# 7. Start both servers
+pnpm dev
+```
+
+Open **http://localhost:5173** — you're automatically logged in as **Dev Player**.
+
+---
+
+## What you can play-test
+
+| Feature | Works in play-test? |
+|---------|-------------------|
+| Daily word puzzle (5–7 letters, 6 guesses) | ✅ |
+| On-screen keyboard + physical keyboard | ✅ |
+| Timer (starts on first keypress) | ✅ |
+| Green / Yellow / Gray tile feedback | ✅ |
+| Colorblind mode toggle | ✅ |
+| Share result (copy to clipboard) | ✅ |
+| Leaderboard (daily + weekly) | ✅ |
+| Battle Pass — free track | ✅ |
+| Battle Pass — premium upgrade ($2.99) | ✅ dev-mode instant upgrade (no card needed) |
+| Profile + stats | ✅ |
+| Google login | ❌ needs Supabase setup (see below) |
 
 ---
 
@@ -10,10 +97,10 @@
 - ⏱ **Server-side timer** — starts on first keypress, computed server-side to prevent cheating
 - 🟩 **Accurate Wordle rules** — correct duplicate-letter evaluation
 - 🏆 **Leaderboards** — daily and weekly, scored by points then solve time
-- 🔐 **Google login** via Supabase Auth
+- 🔐 **Google login** via Supabase Auth (for production)
 - ⚔️ **Battle Pass** — free track + paid Premium track ($2.99 one-time via Stripe) with themes, badges, titles, effects and more
 - 📱 **Mobile-first responsive UI** — touch keyboard, bottom nav, adaptive layouts
-- 🎨 **Colorblind mode** — toggle for orange/blue tiles instead of green/yellow
+- 🎨 **Colorblind mode** — orange/blue tiles instead of green/yellow
 
 ---
 
@@ -39,89 +126,30 @@ cypher-crash/
 │   └── web/          # React + Vite frontend
 ├── packages/
 │   └── shared/       # Shared types + Wordle evaluation logic
+├── docker-compose.yml
 ├── package.json      # Workspace root
 └── pnpm-workspace.yaml
 ```
 
 ---
 
-## Local Development Setup
+## Production Setup (Google login + real payments)
 
-### Prerequisites
-
-- Node.js ≥ 18
-- pnpm ≥ 8 (`npm install -g pnpm`)
-- PostgreSQL running locally (or use a free cloud DB like [Neon](https://neon.tech) or [Supabase](https://supabase.com))
-
-### 1. Install dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Configure environment variables
-
-**API (`apps/api/.env`):**
-```bash
-cp apps/api/.env.example apps/api/.env
-# Edit apps/api/.env with your values:
-#   DATABASE_URL       — PostgreSQL connection string
-#   SUPABASE_URL       — Your Supabase project URL
-#   SUPABASE_JWT_SECRET — Found in Supabase → Project Settings → API → JWT Secret
-#   DAILY_SECRET       — Any long random string
-#   STRIPE_SECRET_KEY  — (optional for dev) Stripe secret key
-#   STRIPE_BATTLE_PASS_PRICE_ID — (optional) Stripe Price ID for $2.99 pass
-```
-
-**Web (`apps/web/.env`):**
-```bash
-cp apps/web/.env.example apps/web/.env
-# Edit apps/web/.env:
-#   VITE_SUPABASE_URL      — Your Supabase project URL
-#   VITE_SUPABASE_ANON_KEY — Supabase anon/public key
-```
-
-### 3. Run database migrations
-
-```bash
-pnpm --filter api db:migrate
-```
-
-### 4. Seed word lists + initial Battle Pass season
-
-```bash
-pnpm --filter api seed
-```
-
-### 5. Start both servers (one command)
-
-```bash
-pnpm dev
-```
-
-- **Web** → [http://localhost:5173](http://localhost:5173)
-- **API** → [http://localhost:3001](http://localhost:3001)
-
----
-
-## Supabase Setup (Google Auth)
+### Supabase (Google Auth)
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **Authentication → Providers → Google** and enable it (you'll need a Google OAuth app from [Google Console](https://console.cloud.google.com)).
-3. Add `http://localhost:5173` to **Redirect URLs** in Supabase Auth settings.
+2. Go to **Authentication → Providers → Google** and enable it (needs a Google OAuth app from [Google Console](https://console.cloud.google.com)).
+3. Add `https://your-domain.com` to **Redirect URLs** in Supabase Auth settings.
 4. Copy your **Project URL** and **anon key** to `apps/web/.env`.
 5. Copy your **JWT Secret** to `apps/api/.env` as `SUPABASE_JWT_SECRET`.
+6. Set `DEV_MODE="false"` and `VITE_DEV_MODE="false"`.
 
----
-
-## Stripe Setup (Battle Pass payments)
+### Stripe (Battle Pass payments)
 
 1. Create a product in [Stripe Dashboard](https://dashboard.stripe.com) → Products → **Cipher Clash Premium Battle Pass**, price = **$2.99 one-time**.
 2. Copy the **Price ID** (`price_...`) to `apps/api/.env` as `STRIPE_BATTLE_PASS_PRICE_ID`.
 3. Copy your **Secret Key** to `STRIPE_SECRET_KEY`.
-4. For webhooks (local dev): use [Stripe CLI](https://stripe.com/docs/stripe-cli): `stripe listen --forward-to localhost:3001/api/battlepass/webhook` and copy the webhook secret to `STRIPE_WEBHOOK_SECRET`.
-
-> **Dev shortcut**: If `STRIPE_SECRET_KEY` is blank, `POST /api/battlepass/upgrade` immediately activates the premium pass without payment (useful for local testing).
+4. For webhooks: use [Stripe CLI](https://stripe.com/docs/stripe-cli): `stripe listen --forward-to localhost:3001/api/battlepass/webhook`.
 
 ---
 
@@ -138,8 +166,7 @@ pnpm dev
 | GET | `/api/me/rank/weekly?weekStart=` | ✅ | Your weekly rank |
 | GET | `/api/me/profile` | ✅ | Profile + stats |
 | GET | `/api/battlepass` | ✅ | Battle Pass season + user progress |
-| POST | `/api/battlepass/upgrade` | ✅ | Create Stripe checkout session |
-| POST | `/api/battlepass/webhook` | — | Stripe webhook (no auth — signature verified) |
+| POST | `/api/battlepass/upgrade` | ✅ | Upgrade to premium ($2.99) |
 
 ---
 
@@ -162,14 +189,13 @@ Leaderboard order: **score desc → solve time asc → finished_at asc**.
 ## Battle Pass
 
 ### Free Track (everyone)
-- Starter Badge (Tier 1), Midnight Theme (3), Dedicated Title (5), Wordsmith Badge (8), Forest Theme (10), Veteran Title (13), Completionist Badge (15)
+Starter Badge → Midnight Theme → Dedicated Title → Wordsmith Badge → Forest Theme → Veteran Title → Completionist Badge
 
 ### Premium Track ($2.99 one-time)
-- Gold Theme (1), Champion Border (2), Sparkle Effect (4), Neon Theme (6), Premium Badge (7), Confetti Effect (9), Crimson Theme (11), Elite Banner (12), Champion Title (14), Legend Badge (15)
+Gold Theme → Champion Border → Sparkle Effect → Neon Theme → Premium Badge → Confetti Effect → Crimson Theme → Elite Banner → Champion Title → Legend Badge
 
 ### Earning XP
 - Play daily puzzle: **+50 XP**
-- Solve performance: +10–60 XP depending on guesses used
-- Streak bonus: +5 XP/day (up to +50 XP)
-- Each tier requires **100 XP**.
-
+- Solve performance: +10–60 XP (fewer guesses = more XP)
+- Streak bonus: **+5 XP/day** (up to +50 XP)
+- Each tier requires **100 XP** · 15 tiers total
